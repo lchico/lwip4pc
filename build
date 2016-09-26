@@ -1,0 +1,7 @@
+#Set this to where you have the lwip core module checked out from CVS
+#default assumes it's a dir named lwip at the same level as the contrib module
+LWIPDIR=./lwip/src
+CFLAGS='-g -Wall -pedantic -Dlinux -DIPv4 -m32 -Os -fpack-struct -DLWIP_DEBUG -I${LWIPDIR}/include -I${LWIPDIR}/include/ipv4 -I.' 
+
+gcc ${*} ${CFLAGS} -o myapp main.c lwip_unix.o contrib/ports/unix/proj/minimal/liblwip4.a contrib/ports/unix/proj/minimal/timer.o
+

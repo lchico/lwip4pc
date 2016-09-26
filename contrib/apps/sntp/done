@@ -1,0 +1,4 @@
+rm sntp.c
+cp ../../../git/lwip-contrib/apps/sntp/sntp.c .
+rm sntp.h
+cp ../../../git/lwip-contrib/apps/sntp/sntp.h .

@@ -1,0 +1,6 @@
+FILELIST="examples src README"
+#tar zcf lwhttpd.tgz --exclude=CVS ${FILELIST}
+if [ -f lwHTTPd.zip ]; then
+	rm lwHTTPd.zip
+fi
+zip -r lwHTTPd.zip ${FILELIST} -x \*/CVS/\* -x \*.o

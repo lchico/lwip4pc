@@ -1,0 +1,12 @@
+<html>
+<head><title>Testing echo var</title></head>
+<body>
+<hr>
+<H1><!--#echo var="text"--></H1>
+<hr>
+<H2><!--#echo var="var8"--></H2>
+<H2><!--#echo var="var16"--></H2>
+<H2><!--#echo var="var32"--></H2>
+<hr>
+</body>
+</html>

@@ -1,0 +1,1 @@
+gcc -g -Wall -pedantic -m32 -Dlinux -DIPv4 -Os -fpack-struct -DLWIP_DEBUG -Icontrib/ports/unix/include -Icontrib/ports/unix/proj/minimal -Ilwip/src/include -Ilwip/src/include/ipv4 -c lwip_unix.c

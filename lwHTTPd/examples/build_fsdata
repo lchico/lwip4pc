@@ -1,0 +1,3 @@
+../src/makefsdata/makefsdata.pl
+
+gcc -g -DLWIP_HTTPD_AUTH -Wall -pedantic -Dlinux -m32 -DIPv4 -Os -fpack-struct -DLWIP_DEBUG -I../../contrib/ports/unix/include -I../../contrib/ports/unix/proj/minimal -I../../contrib/apps/httpserver_raw -I ../../lwip/src/include/ -I../lwip/src/include/ipv4 -I ../src -c fsdata.c 

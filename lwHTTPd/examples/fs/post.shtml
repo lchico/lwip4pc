@@ -1,0 +1,19 @@
+<html>
+<head><title>List</title></head>
+<body>
+<H1>Set vars</H1>
+<form ACTION="setvars.cgi" METHOD="POST">
+<table>
+<tr><td>Text
+<td><input TYPE="TEXT" NAME="text" size=10 value="<!--#echo var="text"-->">
+<tr><td>Var8
+<td><input TYPE="TEXT" NAME="var8" SIZE=5 VALUE=<!--#echo var="var8"-->>
+<tr><td>Var16
+<td><input TYPE="TEXT" NAME="var16" SIZE=5 VALUE=<!--#echo var="var16"-->>
+<tr><td>Var32
+<td><input TYPE="TEXT" NAME="var32" SIZE=5 VALUE=<!--#echo var="var32"-->>
+</table>
+<input TYPE="SUBMIT" VALUE="Submit!">
+</form>
+</body>
+</html>

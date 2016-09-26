@@ -1,0 +1,102 @@
+
+Server Architecture:
+
+tcp_accept(pcb, http_accept);
+http_accept():  
+  alloc mem for http state struct
+  setup callbacks
+	tcp_recv(pcb, http_recv);
+	tcp_err(pcb, http_err);
+	tcp_poll(pcb, http_poll, HTTPD_POLL_INTERVAL);
+	tcp_sent(pcb, http_sent);
+
+
+http_recv(): handle == NULL && !CGI ? -> http_parse_request()
+		N -> Error
+
+http_parse_request():
+	GET -> 	http_find_file() -> http_init_file(), return OK/ERROR
+		OK ? -> http_send()
+	POST -> http_post_request() (see further down)
+
+timer -> http_poll() if a file is open -> http_send()
+
+http_send():
+	choose data handler according to type (HTML, SHTML, CGI)
+	fetch data, use __http_send_data(), return:
+		- 1: data has been written (so call tcp_ouput)
+		- 0: no data has been written (no need to call tcp_output)
+	when no more data will be sent (e.g.: file is done), queue a TCP FIN with the last data packet
+		http_eof(pcb, hs);
+		return 0;
+
+http_continue() (callback function passed to fs_read_async())  -> http_send()
+http_sent() (Data has been sent and acknowledged by the remote host, more data can be sent)  -> http_send()
+
+
+Memory for SSI struct is allocated inside http_init_file() and freed when freeing
+the http_state struct inside http_state_eof()
+Same has been done for CGI
+
+
+
+
+POST:
+http_parse_request():
+	POST -> http_post_request(), return OK/ERROR
+
+http_post_request():
+	-> user httpd_post_begin(), returns OK/ERROR
+		OK -> post accepted, start receiving -> http_post_rxpbuf()
+		ERROR -> response filename provided -> http_find_file() -> http_init_file(), return OK/ERROR
+
+http_recv():
+	(hs->post_content_len_left > 0) ?
+		Y -> http_post_rxpbuf()		we are receiving parts of the content
+		N -> parse request
+	then check again (hs->post_content_len_left == 0) ?
+		Y -> http_send(pcb, hs)	the whole content in the post request has been received, send the response
+
+http_post_rxpbuf():
+	user httpd_post_receive_data()
+	more data will come ?
+		NO -> MANUAL_WND && hs->unrecved_bytes != 0 ?
+			N -> http_handle_post_finished()
+
+http_handle_post_finished():
+	-> user httpd_post_finished() -> response filename provided
+	-> http_find_file() -> http_init_file(), return OK/ERROR
+
+http_close_or_abort_conn(): this is called when the conection is closed, either on normal
+or abnormal situations.
+	(hs->post_content_len_left > 0) or manual wind and hs->unrecved_bytes ?
+		-> user httpd_post_finished() -> no response filename
+
+"auto wind": http_recv() calls tcp_recved(pcb, p->tot_len); to inform
+	the buffer has been accepted and "taken over" (it is not freed, it just does
+	not belong to the stack anymore, an ACK can be sent)
+"manual wind": hs->unrecved_bytes += p->tot_len; Then the user app, when it
+	can handle more data, calls httpd_post_data_recved(len), which:
+		adjusts hs->unrecved_bytes -= len
+		calls tcp_recved(hs->pcb, len)
+		Done with receiving ? -> http_handle_post_finished(hs) + http_send()
+
+And who frees the pbuf's ????
+
+	
+#if LWIP_HTTPD_SUPPORT_POST
+  u32_t post_content_len_left;
+#if LWIP_HTTPD_POST_MANUAL_WND
+  u32_t unrecved_bytes;
+  u8_t no_auto_wnd;
+  u8_t post_finished;
+#endif /* LWIP_HTTPD_POST_MANUAL_WND */
+#endif /* LWIP_HTTPD_SUPPORT_POST*/
+
+
+
+
+
+
+
+

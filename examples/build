@@ -1,0 +1,22 @@
+#Set this to where you have the lwip core module checked out from CVS
+#default assumes it's a dir named lwip at the same level as the contrib module
+LWIPDIR="../lwip/src"
+CONTRIBDIR="../contrib"
+LWIPUNIXDIR=".."
+LWIPINCLUDE="-I${LWIPDIR}/include -I${LWIPDIR}/include/ipv4"
+PLATFORMINCLUDE="-I${CONTRIBDIR}/ports/unix/include -I${CONTRIBDIR}/ports/unix/proj/minimal"
+FLAGS="-DHTTPD_USE_CUSTOM_FSDATA -DLWIP_HTTPD_DYNAMIC_HEADERS -DLWIP_HTTPD_SSI -DLWIP_HTTPD_CGI -DLWIP_HTTPD_AUTH -DLWIP_HTTPD_CGI_USER_SIZE=4 -DLWIP_HTTPD_SUPPORT_POST -DLWIP_HTTPD_SUPPORT_POST_MULTIPART"
+CFLAGS="-g -Wall -Dlinux -DIPv4 -fpack-struct -DLWIP_DEBUG ${FLAGS} ${PLATFORMINCLUDE} ${LWIPINCLUDE} -I${LWIPUNIXDIR} -I." 
+
+gcc ${*} ${CFLAGS} -o echo echo.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o ${CONTRIBDIR}/apps/tcpecho_raw/echo.c -I${CONTRIBDIR}/apps/tcpecho_raw
+gcc ${*} ${CFLAGS} -o dns dns.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o
+gcc ${*} ${CFLAGS} -o udp udp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o
+gcc ${*} ${CFLAGS} -DUDP_SPECIFIC -o udp1 udp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o
+gcc ${*} ${CFLAGS} -DTCP_CLIENT -o tcp_client tcp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o
+gcc ${*} ${CFLAGS} -DTCP_SERVER -o tcp_server tcp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o
+#gcc ${*} -DSNTP_DEBUG=LWIP_DBG_ON ${CFLAGS} -o sntp_addr sntp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o ${CONTRIBDIR}/apps/sntp/sntp.c -I${CONTRIBDIR}/apps/sntp
+gcc ${*} -DSNTP_DEBUG=LWIP_DBG_ON -DSNTP_SERVER_DNS=1 ${CFLAGS} -o sntp_name sntp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o ${CONTRIBDIR}/apps/sntp/sntp.c -I${CONTRIBDIR}/apps/sntp
+gcc ${*} -DSNTP_DEBUG=LWIP_DBG_ON -DUSE_DHCP ${CFLAGS} -o sntp_dhcp sntp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o ${CONTRIBDIR}/apps/sntp/sntp.c -I${CONTRIBDIR}/apps/sntp
+gcc ${*} -DSMTP_DEBUG=LWIP_DBG_ON ${CFLAGS} -o smtp smtp.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o ${CONTRIBDIR}/apps/smtp/smtp.c -I${CONTRIBDIR}/apps/smtp
+gcc ${*} -DSMTP_DEBUG=LWIP_DBG_ON -DSMTP_BODYDH=1 ${CFLAGS} -o smtp_dh smtp_dh.c ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o ${CONTRIBDIR}/apps/smtp/smtp.c -I${CONTRIBDIR}/apps/smtp
+

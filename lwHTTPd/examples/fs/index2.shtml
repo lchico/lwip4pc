@@ -1,0 +1,8 @@
+<html>
+<head><title>Una p&aacute;gina web</title></head>
+<body>
+<hr>
+<H1><!--#exec cmd="listar"--></H1>
+<hr>
+</body>
+</html>

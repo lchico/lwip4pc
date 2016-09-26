@@ -1,0 +1,176 @@
+KNOWN PROBLEMS
+--------------
+
+Errors in CGI POST
+	if request + content is larger than a single TCP segment, the following happens:
+		http_recv() gets the first segments (with the headers) and calls parse_request()
+		parse_request() gets and parses the request, then for some reason it fails
+			Authrization failure, file not found, resource unavailable
+		then it serves the error file
+			need to check the value of hs->handlertype here
+		http_recv() gets the next segment and calls parse_request()
+		parse_request() thinks it is a new request, anything can happen here, mostly ignored
+		when the error file is served, the connection is closed, further incoming data is RST
+		the user gets a "Connection Reset" page
+			I don't see the FINs, is it really being closed ?
+	We should take the whole data (request + content) before closing the connection
+	See "CGI transfer" in RAMBLING section
+
+RAMBLING
+--------
+
+connection: keep-alive is both in http_structs and httpd.c
+	Reference the first one but adjust LEN, as it has 2 extra bytes(CRLF)
+
+Auth validation for rd or rw is done based on method at parse_request()
+Cgi must get uid, version and method (+ keepalive)
+	Cgi knows wether it has to read or write by looking at the method
+	Either copy inside exposed from hs or add a pointer back to hs in http_cgi_state (ugly)
+		in 32-bitters, a pointer is 4 bytes, same as those vars...
+	Pass hs to cgi func (risky)
+	
+Head method
+
+Reuse
+	dynamic headers vars in httpstate ?
+	Req pbuf ptr after first cgi call ?
+
+Eoh, ptr to last received char in header until eoh is received, then state changes.
+
+
+Error pages:
+ Si no existe la página, debe al menos enviar los headers correctos y
+ repetir el header como texto con un poquito de onda como un <H1>
+ Descarta la info de si es HTTP0.9, esto debería corregirse
+
+CGI:
+	HTTP 1.1 keepalive indication (in cgi structure inside http_state)
+		it is inside http_state struct: keepalive field
+
+
+CGI transfer
+	provide legacy-like control transfer to another URI in the system
+		manual: by returning a file name inside the CGI buffer and a special return value ?
+		via function call: to simplify responses in error situations once a CGI started being processed
+	memory for the CGI structure will be freed at conn close, so this must be taken into account
+	 before changing the handler type, that is initting the new URI.
+		probably memory should be freed in the handler itself when the transfer is detected
+		 at the special return value
+
+Memory for SSI struct is allocated inside http_init_file() and freed when freeing
+the http_state struct inside http_state_eof()
+Same has been done for CGI
+
+FastCGI:
+-------
+
+for POST, user function gets the pbuf, which will be NULL when done. Then, for the response,
+calls a public wrap of __http_send_data() or http_write().
+It must handle tcp_recvd() and pbuf_free() stuff by itself.
+
+
+
+POST
+----
+
+My POST implementation + CGI interaction (in the future, other data handlers might use POST)
+
+The function is not written as a state machine, but we can identify the following conditions:
+http_recv(): check state
+	PARSEREQ -> http_parse_request(), each request will change state
+			GET -> SENDBODY
+			POST -> GETBODY
+	SENDBODY -> error condition until we support persistent connections
+	GETBODY -> check handler type, call data handler, error if not CGI+
+			data handler informs when it is done (either the function or itself)
+			http_recv does not know about content length
+			Need a way to transform "manual wind" into the normal operating condition
+
+
+MULTIPART:
+---------
+http://www.ietf.org/rfc/rfc2046.txt	(the generic MIME)
+http://www.ietf.org/rfc/rfc2388.txt	(the multipart/form-data)
+For file transfers, in the HTML form enctype specifies multipart/form-data and
+the request contains CT as such, CL total, and "boundary" for each part.
+cgi_content_info() could check for this type too.
+There will be some helper functions in the future to extract parts using boundaries inside pbufs
+help determinig content-types too.
+variable names: Do yourself a favour and stay to ASCII
+variable content: Do yourself a favour and stay to ASCII, otherwise might need to parse "charset" or assume
+a default one.
+max boundary length (not counting the leading "--"): 70
+
+My boundary:
+---------------------------29775702632753
+My content:
+-----------------------------29775702632753
+Content-Disposition: form-data; name="text"
+
+failneim
+-----------------------------234292488916938
+Content-Disposition: form-data; name="shit"
+
+my ass
+-----------------------------234292488916938
+Content-Disposition: form-data; name="filename"; filename="IE-600.pdf"
+Content-Type: application/pdf
+
+%PDF-1.3
+[...]
+-----------------------------234292488916938
+--
+
+<CRLF>--BOUNDARY<CRLF>
+HEADERS (with their <CRLF>)
+<eoh (empty line, CRLF)>
+CONTENT
+<CRLF>--BOUNDARY
+<CRLF>--
+
+In the first element, the <CRLF> is the eoh of the main headers, not an extra one
+
+In the case of multiple part messages, in which one or more different sets of data are combined
+in a single body, a "multipart" Content-Type field must appear in the entity's header. The body
+must then contain one or more "body parts," each preceded by an encapsulation boundary, and the
+last one followed by a closing boundary. Each part starts with an encapsulation boundary, and
+then contains a body part consisting of header area, a blank line, and a body area. Thus a body
+part is similar to an RFC 822 message in syntax, but different in meaning.
+
+As with all multipart MIME types, each part has an optional "Content-Type", which defaults to
+text/plain.
+Each part should be labelled with an appropriate content-type if the media type is known
+(e.g., inferred from the file extension or operating system typing information) or as
+   "application/octet-stream".
+
+4.5 Charset of text in form data
+
+   Each part of a multipart/form-data is supposed to have a content-
+   type.  In the case where a field element is text, the charset
+   parameter for the text indicates the character encoding used.
+
+   For example, a form with a text field in which a user typed 'Joe owes
+   <eu>100' where <eu> is the Euro symbol might have form data returned
+   as:
+
+    --AaB03x
+    content-disposition: form-data; name="field1"
+    content-type: text/plain;charset=windows-1250
+    content-transfer-encoding: quoted-printable
+
+    Joe owes =80100.
+    --AaB03x
+
+    
+[ CRLF--BOUNDARY
+who knows
+name= or filename= before CRLF
+who knows
+<eoh (empty line, CRLF)>
+content value ] times n; n > 0
+CRLF--BOUNDARY
+CRLF--
+
+   
+
+

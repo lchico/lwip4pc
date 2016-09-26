@@ -1,0 +1,6 @@
+cp sntp.c sntp.c.last
+rm sntp.c
+ln -s ../../../git/lwip-contrib/apps/sntp/sntp.c
+cp sntp.h sntp.h.last
+rm sntp.h
+ln -s ../../../git/lwip-contrib/apps/sntp/sntp.h

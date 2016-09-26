@@ -1,0 +1,13 @@
+#Set this to where you have the lwip core module checked out from CVS
+#default assumes it's a dir named lwip at the same level as the contrib module
+LWIPDIR="../../lwip/src"
+CONTRIBDIR="../../contrib"
+LWHTTPDDIR="../src"
+LWIPUNIXDIR="../.."
+LWIPINCLUDE="-I${LWIPDIR}/include -I${LWIPDIR}/include/ipv4"
+PLATFORMINCLUDE="-I${CONTRIBDIR}/ports/unix/include -I${CONTRIBDIR}/ports/unix/proj/minimal"
+FLAGS="-DHTTPD_USE_CUSTOM_FSDATA -DLWIP_HTTPD_DYNAMIC_HEADERS -DLWIP_HTTPD_SSI -DLWIP_HTTPD_CGI -DLWIP_HTTPD_AUTH -DLWIP_HTTPD_CGI_USER_SIZE=4 -DLWIP_HTTPD_SUPPORT_POST -DLWIP_HTTPD_SUPPORT_POST_MULTIPART"
+CFLAGS="-g -Wall -pedantic -Dlinux -m32 -DIPv4 -fpack-struct -DLWIP_DEBUG ${FLAGS} ${PLATFORMINCLUDE} ${LWIPINCLUDE} -I${LWHTTPDDIR} -I${LWIPUNIXDIR} -I." 
+
+gcc ${*} ${CFLAGS} -o httpd main.c webstuff.c fsdata.o ${LWHTTPDDIR}/httpd.o ${LWHTTPDDIR}/fs.o ${LWHTTPDDIR}/auth.o ${LWIPUNIXDIR}/lwip_unix.o ${CONTRIBDIR}/ports/unix/proj/minimal/liblwip4.a ${CONTRIBDIR}/ports/unix/proj/minimal/timer.o
+

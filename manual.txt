@@ -1,0 +1,219 @@
+
+--- Application polling
+
+When a connection is idle (i.e., no data is either transmitted or
+received), lwIP will repeatedly poll the application by calling a
+specified callback function. This can be used either as a watchdog
+timer for killing connections that have stayed idle for too long, or
+as a method of waiting for memory to become available. For instance,
+if a call to tcp_write() has failed because memory wasn't available,
+the application may use the polling functionality to call tcp_write()
+again when the connection has been idle for a while.
+
+- void tcp_poll(struct tcp_pcb *pcb, 
+                err_t (* poll)(void *arg, struct tcp_pcb *tpcb),
+                u8_t interval)
+
+  Specifies the polling interval and the callback function that should
+  be called to poll the application. The interval is specified in
+  number of TCP coarse grained timer shots, which typically occurs
+  twice a second. An interval of 10 means that the application would
+  be polled every 5 seconds.
+
+  
+pbuf_blue's
+> So say my tcp_recv() callback gives me three pbufs chained:  A->B->C.  If I 
+> need to save some of the data for later, what’s the intended mechanism for 
+> freeing A but not B->C?  Seems like could be accomplished either by 
+> pbuf_ref(B) and then pbuf_free(A) --OR-- pbuf_dechain(A) followed by 
+> pbuf_free(A).  Is that correct? Is either method *more* correct (i.e. always 
+> better), do both methods have their own advantages?
+
+I'd have to look at the source to be sure, but I would probably go for the 
+dechain method.
+(SRC) NOTE: contrib/apps/tcpecho_raw references (pbuf_ref())
+     plen = ptr->len;
+     es->p = ptr->next;     /* continue with next pbuf in chain (if any) */
+     if(es->p != NULL)      /* new reference! */
+       pbuf_ref(es->p);
+      do {     /* chop first pbuf from chain */
+        freed = pbuf_free(ptr);        /* try hard to free pbuf */
+      } while(freed == 0);
+     tcp_recved(tpcb, plen);     /* we can read more data now */
+
+
+> On a related note, if I don’t want to tcp_recv() any more data until 
+> processing the data in B->C, can I just postpone calling tcp_recved()?
+
+No.  That will eventually result in no more data being passed to your callback 
+as it will prevent the sender from transmitting more, but not on a timescale 
+that you are hoping for.  tcp_recved() allows lwIP to re-advertise the memory 
+to the sender so it can transmit more packets, but if there were others already 
+in flight or internal to the stack they will carry on being delivered.  There 
+isn't an easy way with the raw API to stop the stack like that.  It is this 
+sort of feature that the higher layer APIs provide (together with the 
+associated overhead).
+
+> So if I understanding windowing correctly, if want to throttle the remote
+> client from sending more data until I'm ready for it, I need to delay
+> calling tcp_recved(), but still be prepared to handle up to a total of
+> TCP_WND bytes in my tcp_recv() callback?
+
+Exactly
+
+> Will the LwIP stack ever send
+> MORE than TCP_WND bytes through to the tcp_recv() callback without first
+> invoking tcp_recved() to advertise a new window? 
+
+It shouldn't do.
+
+Kieran Mansley <address@hidden> wrote:
+> You don't need to copy it, as this is the
+> point of tcp_recved() - it allows you to keep hold of the data until
+> you've finished with them, even if that's not straight away during the
+> callback.  Once you've processed and finished with the data, call
+> tcp_recved() and the stack will be allowed to reuse those buffers.
+
+Actually, tcp_recved() only updates the TCP window, it does not free data: Once 
+a pbuf has been passed to a recv-callback, it is up to the application to free 
+it (unless returning != ERR_OK, but that's another issue).
+
+So you are free to keep the pbufs pass to your callback on your own list (you 
+can even chain them, as long as tot_len fits into an u16_t), call tcp_recved() 
+for the window to be updated and return ERR_OK to tell the stack that you took 
+over the pbuf.
+
+Delaying tcp_recved() might really not be the best idea, as it might prevent 
+the remote side from sending more data. However, that depends on your 
+application and the window size.
+
+Then, it's up to you if you want to copy the data into a buffer or parse the 
+linked list of pbufs every time you received a new pbuf. This mainly depends on 
+RAM and speed: copying takes some time and RAM, but always scanning a linked 
+list of pbufs may be slow, too.
+
+Simon
+
+
+let's have this scenario:
+
+Data received from TCP is going to some real-time usage, let's say we
+are writing to an SD card or something like that. The point is that when
+data comes from TCP, the application might not be ready to use it for
+some (hundreds of) milliseconds.
+
+LWIP_ASSERT( please check my assumptions are true);
+The application might already have an outstanding pbuf, so the receiving
+function pbuf_cat()s the new pbuf.
+When the application is finished handling prior data, it will tell the
+receiver the amount of data freed, so it can tcp_recved() that amount of
+data (in the long run, the TCP window will somehow adjust the throughput).
+
+Then, at some point, the amount of data used will cross a pbuf boundary,
+so it should be freed. Furthermore, as I (think I) understand, pbufs
+could be chained, and the two pbufs I mention are in fact chains of
+pbufs (a full Ethernet frame coming into a PBUF_POOL ?)
+
+1) I wonder if there is a proper "standard" way of handling this
+situation, an example application, or whatever.
+2) I thought of using pbuf_header(), but I noticed it only adjusts
+->tot_len for the first pbuf in the chain; so I guess I'll have to
+manually move pbuf by pbuf, comparing to their ->len, freeing them one
+by one, and then adjusting with pbuf_header() for the last in chain ?
+2.a) If so, then, could we add this function to pbuf.c ?
+
+Clue:
+(1) Please, don't point me straight through to the POST code in
+httpserver_raw, cause I see it does (2) to remove the header, but I
+don't see it doing any pbuf_free later on for the rest of the content
+(except probably for the last one, didn't check too hard)
+
+...
+so, if you get here by searching the list for an answer to this very
+same question, before browsing the source files, as I did, here is what
+I've found.
+
+There is also an example of pbuf handling in tcpecho_raw
+
+We all know telling the other end to shut up is not the fastest way, but
+if we don't have enough memory to buffer incoming data, we must. So,
+delaying tcp_recvd() will have this effect, be ready to have some
+"external" (to the lwIP stack) way to revive and call tcp_recvd()
+because the lwIP won't call your receiving function again unless there
+is new data.
+
+lwIP is zero-copy, so, if your link level driver allocates pbufs as
+PBUF_POOL (as in the ethernetif example and my DM9000 driver), then your
+receiving functions will get pbuf chains of PBUF_POOL_BUFSIZE (plus some
+possible alignment overhead), unless received data is (of course) smaller...
+
+So, once you are done with some part of the data you received (and
+called tcp_recvd()), either if you manually concatenated two pbufs or
+not, if the amount of data you have just processed is >= chunk size, you
+are ready to free pbuf chunks one by one by moving through the chain.
+To get rid of one pbuf in the chain, you have to reference the next one
+by calling pbuf_ref(q=p->next), and then pbuf_free(p). Then, p is freed
+and q is your new pbuf holding the rest of the data. (This is true if
+"you" are the only one using those pbufs, that is, no other task is also
+referencing them).
+To hide any remaining data at the beginning of the pbuf (for example
+after the former process or when you have just processed < chunk size),
+you can call pbuf_header().
+Assuming you have a valid p chain, holding more data than you just
+processed (because you have just done that from that chain), the former
+text explanation resumes to something like this:
+            while(p->len <= processed_data) {
+              struct pbuf *q;
+              processed_data -= p->len;
+              q = p->next;
+              pbuf_ref(q);
+              pbuf_free(p);
+              p = q;
+            }
+            pbuf_header(p, -(s16_t)processed_data);
+
+Add any safety checks that make you feel safer, and you are done.
+In a NO_SYS=1 environment, there is a shortcut by manually manipulating
+the pbuf fields instead of referencing, but you know that may break
+future compatibility and violates some good practices, don't you ? ;^)
+
+You must return ERR_OK to the lwIP functions once you have freed the
+whole pbuf yourself.
+- void tcp_recv(struct tcp_pcb *pcb, [...]
+  Sets the callback function that will be called when new data
+  arrives. The callback function will be passed a NULL pbuf to
+  indicate that the remote host has closed the connection. If
+  there are no errors and the callback function is to return
+  ERR_OK, then it must free the pbuf. Otherwise, it must not
+  free the pbuf so that lwIP core code can store it.
+
+
+
+
+
+Some "interesting" data. Each pbuf in the chain has:
+ ->len : his own data length
+ ->tot_len : the total from this pbuf until the end of the chain
+ ->ref : the number of references to this pbuf
+So, each pbuf in a pbuf chain has at least one reference: that from the prior pbuf in the chain, or the allocator/holder for the first one in the chain.
+
+
+tcp_sndbuf(), TCP_SND_BUF
+tcp_write()
+tcp_output()
+TCP_OVERSIZE, preallocation, TCP_MSS, succesive writes
+TCP_WRITE_FLAG_COPY
+TCP_SND_QUEUELEN
+
+on freeing pbufs...:
+Since the pbufs include a reference count, they can be freed numerous times. 
+When the reference count is > 1, a deallocation doesn't really deallocate the 
+buffer, it only decrements the reference count. 
+
+TCP utilizes this when data is sent out. Since the data may have to be 
+retransmitted, the reference count of the pbufs are increased before they are 
+passed down to the IP layer. The IP layer free()s the pbufs after they have 
+been handed over to the network interface code. If that code has to queue the 
+pbufs before transmission, they should increase the reference count (using 
+pbuf_ref()) first.
+

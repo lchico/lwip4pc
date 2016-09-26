@@ -1,0 +1,6 @@
+cp smtp.c smtp.c.last
+rm smtp.c
+ln -s ../../../git/lwip-contrib/apps/smtp/smtp.c
+cp smtp.h smtp.h.last
+rm smtp.h
+ln -s ../../../git/lwip-contrib/apps/smtp/smtp.h

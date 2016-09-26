@@ -1,0 +1,51 @@
+Note: 'CGI' and 'SSI' in lwHTTPd are closer to what a regular web designer would expect, instead of the
+traditional (legacy?) httpserver_raw implementation in lwIP's contrib tree.
+ 
+Example URL included:
+
+/index.html -> plain HTML
+/index.shtml -> SSI echo var + CGI with redirect
+/index2.shtml -> SSI exec cmd + auth (user: topdog, password: topsecret)
+/list.cgi -> simple CGI state machine
+/list.html -> CGI usage (GET): extract parameters, urldecode, use static data for state variables
+/post.shtml -> CGI usage (POST, form): same stuff
+/echovar.shtml -> SSI echo vars (to check /post.shtml did the right thing)
+/multipost.shtml -> CGI usage (POST, multipart): WORK IN PROGRESS, DO NOT USE IT, NOT EVEN ALPHA
+
+
+Directory structure:
+
+examples: my "user" code and filesystem area
+src: server build area
+
+
+I basically run ./build on the server build area, and then on the user code area; then run the code through
+the unix minimal project with some mods.
+The code as is, copied to Keil and IAR, compiles OK and runs OK on an ARM Cortex-M3 running my lwIP port, so
+you shouldn't have compilation problems.
+Remember to update the filesystem "image" (see build_fsdata) if you modify the "filesystem" (files under the
+'fs' directory)
+
+Q&A:
+Q: Why <etc.> didn't you use makefile ?
+A: Because batch is easier for me and anyone not knowing make can understand it. I know make is better,
+   I just don't have the time to spend learning it, and this project (as most of my work) will be compiled
+   on make-less embedded systems development environments. Feel free to write a Makefile if you feel the urge,
+   I will definitely include it and use it. Furthermore, the project file structure as it is now is quite
+   different to how it was when it just started; now it would benefit from a Makefile.
+
+
+Release Notes:
+
+I'm not publishing a list of changes, besides what can be inferred from the example list itself. This is
+a work in progress and much change is to be expected. I do have a detailed log in my CVS repository, I just
+won't publish it (yet ?). I'll try not to introduce radical changes in what is already working, but if some
+new and necessary feature requires architectural changes, they will be introduced and the examples updated.
+I don't want to carry a heavy bag of legacy-compatibility stones if it is not strictly necessary, but I
+won't change what is working fine just to be cool.
+
+License:
+
+In addition to what the original writers of the original pieces of code that still remain on this project
+state as a usage license, I introduced my licensing requirements. Please read (and abide to) license.h
+

@@ -1,0 +1,16 @@
+<html>
+<head><title>Another web page</title></head>
+<body>
+<center><img SRC="logo.jpg" ></center>
+<hr>
+<H1><!--#echo var="counter"--></H1>
+<hr>
+<form ACTION="inc.cgi" METHOD="POST">
+<input TYPE="SUBMIT" VALUE="Incrementar">
+</form>
+<BR>
+<form ACTION="reset.cgi" METHOD="POST">
+<input TYPE="SUBMIT" VALUE="Reset">
+</form>
+</body>
+</html>

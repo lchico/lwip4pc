@@ -1,0 +1,3 @@
+indent -kr -hnl -i2 -nut -sc < ~/programming/filesystem/auth.h | grep -B1000 AUTH_USEPREFIX | head -n -1 | sed -e 's#//\(.*\)#/*\1 */#' | sed -e 's/uint8_t/u8_t/g' > auth.h
+echo "#endif /* _AUTH_H */" >> auth.h
+indent -kr -hnl -i2 -nut -sc < ~/programming/filesystem/auth.c | grep -B1000 AUTH_USEPREFIX | head -n -1 | sed -e 's#//\(.*\)#/*\1 */#' | sed -e 's/uint8_t/u8_t/g' | sed -e 's#<stdint.h>#"arch/cc.h"#g' > auth.c

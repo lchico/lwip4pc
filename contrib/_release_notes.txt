@@ -1,0 +1,8 @@
+SNTP:
+	patch #8484
+SMTP:
+	patch #8490
+	patch for bug #42608
+	patch for bug #41500
+	patch for bug #42634
+	patch for bug #42636
